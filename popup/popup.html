@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font: 13px system-ui, sans-serif; width: 280px; margin: 12px; color: #222; }
+    h1 { font-size: 15px; margin: 0 0 10px; }
+    label { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+    .muted { color: #666; font-size: 12px; }
+    .box { background: #f3f5f8; border-radius: 6px; padding: 8px; margin: 10px 0; }
+    button { margin-top: 6px; margin-right: 6px; }
+  </style>
+</head>
+<body>
+  <h1>Plus4U Auto Login</h1>
+  <label><input type="checkbox" id="enabled"> Automatically sign me in</label>
+  <label><input type="checkbox" id="rememberCodes"> Remember access codes</label>
+  <div class="muted">Codes are stored unencrypted in this browser profile (chrome.storage.local). Not needed for Google/Microsoft sign-in.</div>
+  <div class="box">
+    Last login method: <b id="method">none yet</b>
+    <div class="muted" id="status"></div>
+  </div>
+  <button id="open">Open Plus4U</button>
+  <button id="forget">Forget method &amp; codes</button>
+  <script src="../src/shared.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
