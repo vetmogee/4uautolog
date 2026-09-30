@@ -1,5 +1,5 @@
 /* global chrome, P4U */
-// Runs on every *.plus4u.net page (and frame).
+// Runs on every *.plus4u.net and unicornuniversity.net page (and frame).
 //  - On portal pages: if a "Log in" button is visible you are signed out -> click it.
 //  - On the login (OIDC) page: remember which method you use, and when the page
 //    is opened automatically, replay the method you used last.
@@ -260,9 +260,16 @@
   // On plus4u.net and uuApps the signed-out sign-in control is the icon-only plus4u5 app
   // button (aria-label "Navigační tlačítko", i.e. just "navigation button"), so its uu5
   // class is the reliable signal. Text/aria-label/title is the fallback for other pages.
+  // unicornuniversity.net/cs/uis has the same +4U button in the top-right corner (grey when
+  // signed out, green when signed in) plus a "Přihlásit se" button in the page body. There,
+  // only the +4U button counts, so the text fallback is off.
+  const UU_SITE = /(^|\.)unicornuniversity\.net$/i.test(location.hostname);
+  const appButton = (state) =>
+    Array.from(document.querySelectorAll(".plus4u5-app-button-" + state)).find(isVisible) || null;
+
   function findLoginButton() {
-    const appButton = Array.from(document.querySelectorAll(".plus4u5-app-button-not-authenticated")).find(isVisible);
-    if (appButton) return appButton;
+    const btn = appButton("not-authenticated");
+    if (btn || UU_SITE) return btn;
     return (
       clickables().find(
         (el) =>
@@ -288,7 +295,9 @@
     if (!s.enabled) return;
     if (s.pausedUntil && Date.now() < s.pausedUntil) return P4U.log("Paused after manual logout.");
 
-    const btn = await waitFor(findLoginButton);
+    // Settle as soon as the +4U button shows either state; a green (authenticated) one means done.
+    const found = await waitFor(() => appButton("authenticated") || findLoginButton());
+    const btn = found && !found.classList.contains("plus4u5-app-button-authenticated") ? found : null;
     if (!btn) {
       badge("");
       return P4U.log("Signed in (no login button found).");
@@ -313,7 +322,7 @@
       } catch (err) {
         return;
       }
-      if (!/(^|\.)plus4u\.net$/i.test(host)) return;
+      if (!/(^|\.)plus4u\.net$/i.test(host)) return; // the login itself is always on uuidentity.plus4u.net
       P4U.log("Login popup was blocked – opening it from the extension.");
       try {
         chrome.runtime.sendMessage({ type: "open-login", url: d.url });

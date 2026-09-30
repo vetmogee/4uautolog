@@ -2,13 +2,16 @@
 
 A Chrome extension (Manifest V3) that keeps you signed in to the **Plus4U** portal used by Unicorn University.
 
-On every `*.plus4u.net` page it:
+It works on every `*.plus4u.net` page and on the Unicorn University information system entry page, **https://unicornuniversity.net/cs/uis**. On that page it watches the **+4U button in the top-right corner**: grey means signed out, green means signed in. It never clicks the *Přihlásit se* button in the page body.
+
+On each of these pages it:
 
 1. **Checks whether you are signed in.** When you are signed out, plus4u.net and uuApps show an icon-only sign-in button in the top bar (the `plus4u5-app-button-not-authenticated` button, whose aria-label is just *Navigační tlačítko*). If the extension sees it, or a text button such as *Přihlásit se / Prihlásiť sa / Log in / Sign in / Đăng nhập*, it clicks it.
 2. **Signs you in with the method you used last**, on the Plus4U login page:
    `https://uuidentity.plus4u.net/uu-identitymanagement-maing01/a9b105aff2744771be4daa8361954677/login?…`
    - **+4U Access (access codes):** clicks *Continue with +4U Access*, fills *Access code 1* and *Access code 2* (`accessCode1` / `accessCode2`), and clicks *Sign in*. The codes are only saved if you turn on *Remember access codes* in the popup.
    - **Google / Microsoft / Facebook / Apple:** clicks the same *Continue with …* button again. If you are already signed in to that provider in Chrome, it finishes without any input from you.
+   - **Google account chooser:** if Google asks which account to use, the extension remembers the account you pick and picks it for you next time. It does this only for Google sign-ins started by Plus4U (where the Google page returns to `*.plus4u.net`), never for other sites. It picks at most once per window every 2 minutes, and it leaves password, 2-step verification and consent screens to you.
 
 The extension learns your method by watching your own (real) clicks on the login page, so **sign in manually once** after you install it.
 
@@ -22,7 +25,7 @@ The portal opens the login page in a popup. Chrome blocks popups that a script (
 2. Open `chrome://extensions`, then turn on **Developer mode**.
 3. Click **Load unpacked** and select this folder.
 4. Click the extension icon. If you sign in with access codes, turn on *Remember access codes*.
-5. Go to https://plus4u.net/ and sign in once as usual.
+5. Go to https://unicornuniversity.net/cs/uis (or https://plus4u.net/) and sign in once as usual. If you use Google, pick your account in Google's chooser yourself that first time.
 
 ## Languages
 
@@ -45,7 +48,8 @@ The login page follows your **browser language**, not the `uiLocales` URL parame
 - **reCAPTCHA:** the login page loads Google reCAPTCHA (the invisible badge). When tested, submitting access codes sent no reCAPTCHA token and triggered no challenge. If Plus4U or Google starts showing a reCAPTCHA challenge, you have to solve it yourself: the extension does not try to get around it and just stops.
 - **Two-factor / higher assurance:** the login is requested with `acrValues=standard high veryHigh`. If your account asks for a second factor or extra confirmation after the codes, you have to complete that step yourself.
 - **E-mail sign-in:** the *e-mail → Sign in* path isn't learned or replayed. Use +4U Access or a provider button.
-- **Providers:** after the extension clicks Google, Microsoft and so on, the rest happens on the provider's site. It is automatic only if you are already signed in there and don't need to pick an account.
+- **Providers:** after the extension clicks Google, Microsoft and so on, the rest happens on the provider's site. It is automatic only if you are already signed in there. For Google, the account chooser is handled (see above). For the other providers, you still pick the account yourself.
+- **Google permission:** to handle the account chooser, the extension needs access to `accounts.google.com`. The script there does nothing unless the sign-in was started by Plus4U.
 
 ## Badge
 

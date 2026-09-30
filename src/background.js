@@ -11,7 +11,8 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
 
 // The portal opens the login page in a popup, which Chrome blocks when the extension (not you)
 // clicks the button. Open the same URL in a popup window instead. Once it has signed you in and
-// returned to a Plus4U page that is not the login page, close it and reload the portal tab:
+// returned to a Plus4U or unicornuniversity.net page that is not the login page (e.g. the
+// unicornuniversity.net/oidc/callback), close it and reload the portal tab:
 // the portal then picks up the new session by itself (silent OIDC sign-in).
 const LOGIN_HOST = /^(oidc|uuidentity|identity|login)\./i;
 
@@ -37,7 +38,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
   } catch (e) {
     return;
   }
-  if (!/(^|\.)plus4u\.net$/i.test(host) || LOGIN_HOST.test(host)) return;
+  if (!/(^|\.)(plus4u|unicornuniversity)\.net$/i.test(host) || LOGIN_HOST.test(host)) return;
   await chrome.storage.session.remove("loginWindow");
   chrome.windows.remove(loginWindow.windowId).catch(() => {});
   chrome.tabs.reload(loginWindow.returnTabId).catch(() => {});

@@ -5,7 +5,9 @@ async function render() {
   const s = await P4U.get();
   $("enabled").checked = s.enabled;
   $("rememberCodes").checked = s.rememberCodes;
-  $("method").textContent = s.lastMethod ? s.lastMethod.label : "none yet";
+  $("method").textContent = s.lastMethod
+    ? s.lastMethod.label + (s.lastMethod.label === "Google" && s.googleAccount ? " (" + s.googleAccount + ")" : "")
+    : "none yet";
   const status = [];
   if (!s.lastMethod) status.push("Log in once manually so the extension can learn your method.");
   if (s.lastMethod && s.lastMethod.kind === "access-codes" && !s.codes) status.push("Access codes not saved – you'll be asked to type them.");
@@ -20,7 +22,7 @@ $("rememberCodes").addEventListener("change", (e) => {
   if (!e.target.checked) patch.codes = null;
   P4U.set(patch).then(render);
 });
-$("forget").addEventListener("click", () => P4U.set({ lastMethod: null, codes: null, attempts: [] }).then(render));
-$("open").addEventListener("click", () => chrome.tabs.create({ url: "https://plus4u.net/" }));
+$("forget").addEventListener("click", () => P4U.set({ lastMethod: null, codes: null, googleAccount: null, attempts: [] }).then(render));
+$("open").addEventListener("click", () => chrome.tabs.create({ url: "https://unicornuniversity.net/cs/uis" }));
 
 render();

@@ -6,6 +6,7 @@ var P4U = (function () {
     rememberCodes: false,
     lastMethod: null, // { kind: "access-codes" | "provider" | "button", label, selector, text }
     codes: null, // { code1, code2 } – only saved when rememberCodes is true
+    googleAccount: null, // e-mail picked in Google's account chooser during a Plus4U sign-in
     pausedUntil: 0, // set after a manual logout so we do not log straight back in
     attempts: [] // timestamps of recent automatic attempts (loop guard)
   };
