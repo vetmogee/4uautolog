@@ -1,12 +1,18 @@
 {
   "manifest_version": 3,
   "name": "Plus4U Auto Login (Unicorn University)",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Checks whether you are signed in to the Plus4U portal and, if not, signs you in with the login method you used last.",
   "permissions": ["storage"],
   "host_permissions": ["https://*.plus4u.net/*"],
   "background": { "service_worker": "src/background.js" },
   "content_scripts": [
+    {
+      "matches": ["https://*.plus4u.net/*"],
+      "js": ["src/page-hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
     {
       "matches": ["https://*.plus4u.net/*"],
       "js": ["src/shared.js", "src/content.js"],

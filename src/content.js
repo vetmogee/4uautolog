@@ -8,10 +8,20 @@
 
   const WAIT_MS = 15000;
 
-  const LOGIN_TEXT = /^(přihlásit(\s+se)?|prihlásiť(\s+sa)?|log\s*-?\s*in|sign\s*-?\s*in)$/i;
-  const LOGOUT_TEXT = /(odhlásit|odhlásiť|log\s*-?\s*out|sign\s*-?\s*out)/i;
-  const SUBMIT_TEXT = /(přihlásit|prihlásiť|log\s*-?\s*in|sign\s*-?\s*in|continue|pokračovat|potvrdit|confirm|ok)/i;
-  const ACCESS_CODES_TEXT = /(access\s*codes?|přístupov|prístupov)/i;
+  // Labels in Czech, Slovak, English and Vietnamese. Patterns and page text are both
+  // NFC-normalised (see nfc/textOf) so precomposed and combining diacritics match alike.
+  const nfc = (s) => String(s).normalize("NFC");
+  const re = (src) => new RegExp(nfc(src), "iu");
+
+  const LOGIN_TEXT = re(String.raw`^(přihlásit(\s+se)?|prihlásiť(\s+sa)?|log\s*-?\s*in|sign\s*-?\s*in|đăng\s+nhập)$`);
+  const LOGOUT_TEXT = re(String.raw`(odhlásit|odhlásiť|log\s*-?\s*out|sign\s*-?\s*out|đăng\s+xuất)`);
+  const SUBMIT_TEXT = re(
+    String.raw`(přihlásit|prihlásiť|log\s*-?\s*in|sign\s*-?\s*in|continue|pokračovat|pokračovať|potvrdit|potvrdiť|confirm|^ok$|đăng\s+nhập|tiếp\s+tục|xác\s+nhận)`
+  );
+  // "Continue with +4U Access" opens the access-code form on uuidentity.plus4u.net.
+  const ACCESS_CODES_TEXT = re(String.raw`(\+\s*4\s*u\s*access|access\s*codes?|přístupov|prístupov|mã\s+truy\s+cập)`);
+  // "Forgot your access codes?" also mentions access codes but must never be clicked.
+  const FORGOT_TEXT = re(String.raw`(forgot|zapomněl|zabudl|quên)`);
   const PROVIDERS = [
     ["Google", /google/i],
     ["Microsoft", /(microsoft|office\s*365|outlook|azure)/i],
@@ -20,7 +30,8 @@
     ["GitHub", /github/i],
     ["LinkedIn", /linkedin/i],
     ["Bank ID", /bank\s*id/i],
-    ["Mobile app", /(uu\s*id|mobil|mobile|qr)/i]
+    // \b keeps "uuidentity" (in every login-page link) from counting as the uuID app.
+    ["Mobile app", /(\buu\s*id\b|mobil|mobile|\bqr\b)/i]
   ];
 
   // ---------- DOM helpers ----------
@@ -28,12 +39,14 @@
   const isVisible = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
 
   const textOf = (el) =>
-    (el.innerText || el.value || el.getAttribute("aria-label") || el.getAttribute("title") || "")
+    nfc(el.innerText || el.value || el.getAttribute("aria-label") || el.getAttribute("title") || "")
       .replace(/\s+/g, " ")
       .trim();
 
   const clickables = () =>
-    Array.from(document.querySelectorAll('button, a, [role="button"], input[type="submit"], input[type="button"]')).filter(isVisible);
+    Array.from(
+      document.querySelectorAll('button, a, [role="button"], [role="menuitem"], input[type="submit"], input[type="button"]')
+    ).filter(isVisible);
 
   function selectorFor(el) {
     if (el.id && !/\d{4,}|^[a-f0-9-]{16,}$/i.test(el.id)) return "#" + CSS.escape(el.id);
@@ -81,8 +94,14 @@
 
   // ---------- Access code form ----------
 
-  // Plus4U signs you in with "Access code 1" + "Access code 2" (the second one is a password field).
+  // Plus4U signs you in with "Access code 1" + "Access code 2". On uuidentity.plus4u.net both are
+  // password inputs named accessCode1/accessCode2 (their ids are random per render).
   function findCodeInputs() {
+    const byName = (n) => Array.from(document.querySelectorAll(`input[name="${n}"]`)).find(isVisible) || null;
+    const c1 = byName("accessCode1");
+    const c2 = byName("accessCode2");
+    if (c2) return { code1: c1, code2: c2, scope: c2.form || c2.closest("div[class*='form'], section, main") || document };
+
     const pw = Array.from(document.querySelectorAll('input[type="password"]')).find(isVisible);
     if (!pw) return null;
     const scope = pw.form || pw.closest("div[class*='form'], section, main") || document;
@@ -93,6 +112,8 @@
     return { code1: null, code2: pw, scope };
   }
 
+  // The real form has no submit button: "Sign in" is a type="button" next to an icon-only
+  // back button and "Forgot your access codes?", so match by text and skip the latter.
   function findSubmit(scope) {
     const root = scope || document;
     const typed = root.querySelector('button[type="submit"], input[type="submit"]');
@@ -100,8 +121,13 @@
     return (
       Array.from(root.querySelectorAll('button, [role="button"], input[type="button"]'))
         .filter(isVisible)
-        .find((b) => SUBMIT_TEXT.test(textOf(b))) || null
+        .find((b) => SUBMIT_TEXT.test(textOf(b)) && !FORGOT_TEXT.test(textOf(b))) || null
     );
+  }
+
+  // "Continue with +4U Access" (an <a role="menuitem">) reveals the access-code form.
+  function findAccessCodesOpener() {
+    return clickables().find((el) => ACCESS_CODES_TEXT.test(textOf(el)) && !FORGOT_TEXT.test(textOf(el))) || null;
   }
 
   // ---------- Page classification ----------
@@ -119,6 +145,7 @@
 
   function classify(el) {
     const text = textOf(el);
+    if (FORGOT_TEXT.test(text)) return null;
     if (ACCESS_CODES_TEXT.test(text)) return { kind: "access-codes", label: "Access codes" };
     for (const [label, re] of PROVIDERS) {
       if (re.test(text) || re.test(el.getAttribute("href") || "") || re.test(el.className || "")) {
@@ -146,7 +173,7 @@
         const el = e.target.closest('button, a, [role="button"], input[type="submit"], input[type="button"]');
         if (!el) return;
         const f = findCodeInputs();
-        if (f && f.scope.contains(el) && f.code2.value) return rememberCodesSubmit();
+        if (f && f.scope.contains(el) && f.code2.value && !FORGOT_TEXT.test(textOf(el))) return rememberCodesSubmit();
         const method = classify(el);
         if (method && method.kind === "provider") {
           await P4U.set({ lastMethod: method, attempts: [] });
@@ -183,18 +210,16 @@
   }
 
   async function loginWithCodes(s) {
-    let f = await waitFor(() => {
+    const formReady = () => {
       const r = findCodeInputs();
       return r && r.code2 ? r : null;
-    }, 4000);
-    if (!f) {
-      // The codes form may be behind an "Access codes" tab/button.
-      const tab = clickables().find((el) => ACCESS_CODES_TEXT.test(textOf(el)));
-      if (tab) tab.click();
-      f = await waitFor(() => {
-        const r = findCodeInputs();
-        return r && r.code2 ? r : null;
-      });
+    };
+    // The real login page starts on an e-mail/provider chooser; the code form only appears
+    // after "Continue with +4U Access". Wait for whichever shows up first.
+    let f = await waitFor(() => formReady() || findAccessCodesOpener());
+    if (f && !f.code2) {
+      f.click();
+      f = await waitFor(formReady);
     }
     if (!f) return P4U.log("Access code form not found");
     if (!s.codes || !s.codes.code2) {
@@ -232,8 +257,20 @@
 
   // ---------- Portal: are we signed in? ----------
 
+  // On plus4u.net and uuApps the signed-out sign-in control is the icon-only plus4u5 app
+  // button (aria-label "Navigační tlačítko", i.e. just "navigation button"), so its uu5
+  // class is the reliable signal. Text/aria-label/title is the fallback for other pages.
   function findLoginButton() {
-    return clickables().find((el) => LOGIN_TEXT.test(textOf(el))) || null;
+    const appButton = Array.from(document.querySelectorAll(".plus4u5-app-button-not-authenticated")).find(isVisible);
+    if (appButton) return appButton;
+    return (
+      clickables().find(
+        (el) =>
+          LOGIN_TEXT.test(textOf(el)) ||
+          LOGIN_TEXT.test(nfc(el.getAttribute("aria-label") || "").trim()) ||
+          LOGIN_TEXT.test(nfc(el.getAttribute("title") || "").trim())
+      ) || null
+    );
   }
 
   async function runPortalPage() {
@@ -262,9 +299,33 @@
     }
     P4U.log("Signed out – opening login.");
     badge("…");
+    // Our click has no user gesture, so the login popup it opens gets blocked. page-hook.js
+    // reports the blocked URL; only accept it shortly after our own click, and only for Plus4U.
+    const until = Date.now() + 10000;
+    window.addEventListener("message", function onMsg(e) {
+      const d = e.data;
+      if (e.source !== window || !d || d.source !== "p4u-autologin" || d.type !== "popup-blocked") return;
+      window.removeEventListener("message", onMsg);
+      if (Date.now() > until) return;
+      let host = "";
+      try {
+        host = new URL(d.url).hostname;
+      } catch (err) {
+        return;
+      }
+      if (!/(^|\.)plus4u\.net$/i.test(host)) return;
+      P4U.log("Login popup was blocked – opening it from the extension.");
+      try {
+        chrome.runtime.sendMessage({ type: "open-login", url: d.url });
+      } catch (err) {
+        /* extension reloaded */
+      }
+    });
     btn.click();
   }
 
+  // The OIDC callback (e.g. www.plus4u.net/oidc/callback) only hands the result back; leave it alone.
+  if (/\/oidc\/callback\b/i.test(location.pathname)) return;
   if (isLoginPage()) runLoginPage();
   else if (window === window.top) runPortalPage();
 })();
